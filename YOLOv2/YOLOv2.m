@@ -7,8 +7,8 @@ if ~doTraining && ~exist('yolov2ResNet50VehicleExample_19b.mat','file')
 end
 
 % load dataset
-data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\labels.mat');
-Dataset = [data.gTruth.DataSource.Source, data.gTruth.LabelData];
+data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\all_labels.mat');
+Dataset = [data.gTruth.DataSource, data.gTruth.LabelData];
 
 % Display first few rows of the data set.
 Dataset(1:4,:)
@@ -47,12 +47,12 @@ annotatedImage = imresize(annotatedImage,2);
 % figure
 % imshow(annotatedImage)
 
-inputSize = [256 512 3];
+inputSize = [512 1024 3];
 
 numClasses = width(Dataset)-1;
 
 trainingDataForEstimation = transform(trainingData,@(data)preprocessData(data,inputSize));
-numAnchors = 7;
+numAnchors = 2;
 [anchorBoxes, meanIoU] = estimateAnchorBoxes(trainingDataForEstimation, numAnchors);
 
 featureExtractionNetwork = resnet50('weight','none');
@@ -85,12 +85,12 @@ annotatedImage = imresize(annotatedImage,2);
 % figure
 % imshow(annotatedImage)
 
-options = trainingOptions('sgdm', ...
+options = trainingOptions('adam', ...
         'Verbose',true,...
         'VerboseFrequency',10,...
         'MiniBatchSize',8, ....
         'InitialLearnRate',1e-5, ...
-        'MaxEpochs',20, ...
+        'MaxEpochs',80, ...
         'CheckpointPath',tempdir, ...
         'ValidationData',preprocessedValidationData);
     

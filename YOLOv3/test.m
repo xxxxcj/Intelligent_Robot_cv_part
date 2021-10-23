@@ -1,4 +1,4 @@
-yolov3Detector = load("yolov3_v1.mat").yolov3Detector;
+yolov3Detector = load("yolov3_v4.mat").yolov3Detector;
 inputSize = [227 227 3];
 
 %I = imread('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\010.jpg');

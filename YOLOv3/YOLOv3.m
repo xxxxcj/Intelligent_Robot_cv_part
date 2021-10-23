@@ -1,20 +1,20 @@
-doTraining = true;
+doTraining = 0;
 
 if ~doTraining
-    preTrainedDetector = downloadPretrainedYOLOv3Detector();    
+    preTrainedDetector = load('yolov3_v4.mat').yolov3Detector; 
 end
 
 % unzip vehicleDatasetImages.zip
 % data = load('vehicleDatasetGroundTruth.mat');
 % vehicleDataset = data.vehicleDataset;
 
-data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\labels.mat');
-vehicleDataset = [data.gTruth.DataSource.Source, data.gTruth.LabelData];
+data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\all_labels.mat');
+vehicleDataset = [data.gTruth.DataSource, data.gTruth.LabelData];
 
 % Add the full path to the local vehicle data folder.
 % vehicleDataset.imageFilename = fullfile(pwd, vehicleDataset.imageFilename);
 
-rng(0);
+% rng(0);
 shuffledIndices = randperm(height(vehicleDataset));
 idx = floor(0.6 * length(shuffledIndices));
 trainingDataTbl = vehicleDataset(shuffledIndices(1:idx), :);
@@ -38,30 +38,33 @@ augmentedTrainingData = transform(trainingData, @augmentData);
 augmentedData = cell(4,1);
 for k = 1:4
     data = read(augmentedTrainingData);
-    augmentedData{k} = insertShape(data{1,1}, 'Rectangle', data{1,2});
+    augmentedData{k} = insertShape(data{1,1}, 'Rectangle', data{1,2}, 'LineWidth',5);
     reset(augmentedTrainingData);
 end
 figure
 montage(augmentedData, 'BorderSize', 10)
 
-networkInputSize = [227 227 3];
+networkInputSize = [751 1563 3];
 
 rng(0)
 trainingDataForEstimation = transform(trainingData, @(data)preprocessData(data, networkInputSize));
-numAnchors = 6;
+numAnchors = 2;
+midAnchors = 1;
 [anchors, meanIoU] = estimateAnchorBoxes(trainingDataForEstimation, numAnchors)
 
 area = anchors(:, 1).*anchors(:, 2);
 [~, idx] = sort(area, 'descend');
 anchors = anchors(idx, :);
-anchorBoxes = {anchors(1:3,:)
-    anchors(4:6,:)
+anchorBoxes = {anchors(1:midAnchors,:)
+    anchors(midAnchors+1:end,:)
     };
 
 baseNetwork = squeezenet;
 classNames = trainingDataTbl.Properties.VariableNames(2:end);
 
-yolov3Detector = yolov3ObjectDetector(baseNetwork, classNames, anchorBoxes, 'DetectionNetworkSource', {'fire9-concat', 'fire5-concat'});
+yolov3Detector = yolov3ObjectDetector(baseNetwork, classNames, anchorBoxes, ...
+    'DetectionNetworkSource', {'fire9-concat', 'fire5-concat'},...
+    'InputSize',networkInputSize(1:2));
 
 preprocessedTrainingData = transform(augmentedTrainingData, @(data)preprocess(yolov3Detector, data));
 
@@ -147,6 +150,9 @@ results = detect(yolov3Detector,testData,'MiniBatchSize',8);
 % Evaluate the object detector using Average Precision metric.
 [ap,recall,precision] = evaluateDetectionPrecision(results,testData);
 
+recall = cell2mat(recall);
+precision = cell2mat(precision);
+
 % Plot precision-recall curve.
 figure
 plot(recall,precision)
@@ -156,7 +162,7 @@ grid on
 title(sprintf('Average Precision = %.2f', ap))
 
 % Read the datastore.
-data = read("dataset/001.jpg");
+data = read(testData);
 
 % Get the image.
 I = data{1};
@@ -164,7 +170,7 @@ I = data{1};
 [bboxes,scores,labels] = detect(yolov3Detector,I);
 
 % Display the detections on image.
-I = insertObjectAnnotation(I,'rectangle',bboxes,scores);
+I = insertObjectAnnotation(I,'rectangle',bboxes,labels);
 
 figure
 imshow(I)
