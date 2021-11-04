@@ -1,5 +1,5 @@
-data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\all_labels.mat');
-Dataset = [data.gTruth.DataSource, data.gTruth.LabelData];
+data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\labels.mat');
+Dataset = [data.gTruth.DataSource.Source, data.gTruth.LabelData];
 
 % rng(0);
 shuffledIndices = randperm(height(Dataset));

@@ -1,7 +1,0 @@
-I = imread('dataset\001.jpg');
-I = imresize(I,inputSize(1:2));
-[bboxes,scores, labels] = detect(detector,I);
-
-I = insertObjectAnnotation(I,'rectangle',bboxes, labels);
-figure
-imshow(I)

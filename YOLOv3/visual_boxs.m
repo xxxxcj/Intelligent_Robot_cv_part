@@ -1,4 +1,4 @@
-data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\all_labels.mat').gTruth.LabelData;
+data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\labels2.mat').gTruth.LabelData;
 
 [r,c] = size(data);
 all_boxes = [];
@@ -7,7 +7,10 @@ for i = 1:r        % 建立for循环嵌套
         tmp = table2array(data(i,k));
         tmp = cell2mat(tmp);
         if ~isempty(tmp)
-            all_boxes = [all_boxes;tmp(:,3:4)];
+            [kr,~] = size(tmp);
+            for t = 1:kr
+                all_boxes = [all_boxes;tmp(t,3:4) i k];
+            end
         end
     end
 end

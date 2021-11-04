@@ -7,8 +7,8 @@ if ~doTraining && ~exist('yolov2ResNet50VehicleExample_19b.mat','file')
 end
 
 % load dataset
-data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\all_labels.mat');
-Dataset = [data.gTruth.DataSource, data.gTruth.LabelData];
+data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\labels2.mat');
+Dataset = [data.gTruth.DataSource.Source, data.gTruth.LabelData];
 
 % Display first few rows of the data set.
 Dataset(1:4,:)
@@ -47,21 +47,50 @@ annotatedImage = imresize(annotatedImage,2);
 % figure
 % imshow(annotatedImage)
 
-inputSize = [512 1024 3];
+inputSize = [270 480 3];
 
 numClasses = width(Dataset)-1;
 
 trainingDataForEstimation = transform(trainingData,@(data)preprocessData(data,inputSize));
-numAnchors = 2;
+numAnchors = 4;
 [anchorBoxes, meanIoU] = estimateAnchorBoxes(trainingDataForEstimation, numAnchors);
 
-featureExtractionNetwork = resnet50('weight','none');
+net = mobilenetv2();
+lgraph = layerGraph(net);
 
-featureLayer = 'activation_40_relu';
+imgLayer = imageInputLayer(inputSize,"Name","input_1");
+lgraph = replaceLayer(lgraph,"input_1",imgLayer);
 
-lgraph = yolov2Layers(inputSize,numClasses,anchorBoxes,featureExtractionNetwork,featureLayer);
+featureExtractionLayer = "block_12_add";
 
-augmentedTrainingData = transform(trainingData,@augmentData);
+filterSize = [3 3];
+numFilters = 96;
+
+detectionLayers = [
+    convolution2dLayer(filterSize,numFilters,"Name","yolov2Conv1","Padding", "same", "WeightsInitializer",@(sz)randn(sz)*0.01)
+    batchNormalizationLayer("Name","yolov2Batch1")
+    reluLayer("Name","yolov2Relu1")
+    convolution2dLayer(filterSize,numFilters,"Name","yolov2Conv2","Padding", "same", "WeightsInitializer",@(sz)randn(sz)*0.01)
+    batchNormalizationLayer("Name","yolov2Batch2")
+    reluLayer("Name","yolov2Relu2")
+    ];
+
+numPredictionsPerAnchor = 5;
+
+numFiltersInLastConvLayer = numAnchors*(numClasses+numPredictionsPerAnchor);
+
+detectionLayers = [
+    detectionLayers
+    convolution2dLayer(1,numFiltersInLastConvLayer,"Name","yolov2ClassConv",...
+    "WeightsInitializer", @(sz)randn(sz)*0.01)
+    yolov2TransformLayer(numAnchors,"Name","yolov2Transform")
+    yolov2OutputLayer(anchorBoxes,"Name","yolov2OutputLayer")
+    ];
+
+lgraph = addLayers(lgraph,detectionLayers);
+lgraph = connectLayers(lgraph,featureExtractionLayer,"yolov2Conv1");
+
+augmentedTrainingData = transform(trainingData, @augmentData);
 
 % Visualize the augmented images.
 augmentedData = cell(4,1);
@@ -82,15 +111,15 @@ I = data{1};
 bbox = data{2};
 annotatedImage = insertShape(I,'Rectangle',bbox);
 annotatedImage = imresize(annotatedImage,2);
-% figure
-% imshow(annotatedImage)
+figure
+imshow(annotatedImage)
 
 options = trainingOptions('adam', ...
         'Verbose',true,...
         'VerboseFrequency',10,...
-        'MiniBatchSize',8, ....
-        'InitialLearnRate',1e-5, ...
-        'MaxEpochs',80, ...
+        'MiniBatchSize',16, ....
+        'InitialLearnRate',1e-3, ...
+        'MaxEpochs',20, ...
         'CheckpointPath',tempdir, ...
         'ValidationData',preprocessedValidationData);
     
@@ -123,4 +152,3 @@ xlabel('Recall')
 ylabel('Precision')
 grid on
 title(sprintf('Average Precision = %.2f',ap))
-

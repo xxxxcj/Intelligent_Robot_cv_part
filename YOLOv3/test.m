@@ -1,31 +1,46 @@
-yolov3Detector = load("yolov3_v4.mat").yolov3Detector;
-inputSize = [227 227 3];
+modelPath = "yolov3_v9_mask.mat";
+datasetPath = 'C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\data\testtable_v9_mask.mat';
+inputSize = [240 480 3];
 
-%I = imread('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\010.jpg');
-% I = imresize(I,inputSize(1:2));
+yolov3Detector = load(modelPath).yolov3Detector;
 
-data = load('C:\Users\10142\MATLAB\Projects\Intelligent_Robot_cv_part\dataset\labels.mat');
-vehicleDataset = [data.gTruth.DataSource.Source, data.gTruth.LabelData];
+% dataset = load(datasetPath);
+% bcDataset = [dataset.gTruth.DataSource.Source, dataset.gTruth.LabelData];
+% [datasetR, datasetC] = size(dataset.gTruth.LabelData);
+% 
+% trainingDataTbl = bcDataset;
+% imdsTrain = imageDatastore(trainingDataTbl{:,1});
+% bldsTrain = boxLabelDatastore(trainingDataTbl(:, 2:end));
+% 
+% trainingData = combine(imdsTrain, bldsTrain);
 
-% Add the full path to the local vehicle data folder.
-% vehicleDataset.imageFilename = fullfile(pwd, vehicleDataset.imageFilename);
+trainingData = load(datasetPath).testData;
+[datasetR, datasetC] = size(trainingData.UnderlyingDatastores{1,1}.Files);
 
-rng(0);
-shuffledIndices = randperm(height(vehicleDataset));
-idx = floor(0.6 * length(shuffledIndices));
-trainingDataTbl = vehicleDataset(shuffledIndices(1:idx), :);
-imdsTrain = imageDatastore(trainingDataTbl{:,1});
-bldsTrain = boxLabelDatastore(trainingDataTbl(:, 2:end));
-
-trainingData = combine(imdsTrain, bldsTrain);
 validateInputData(trainingData);
 preprocessedTrainingData = transform(trainingData, @(data)preprocess(yolov3Detector, data));
 
-data = read(preprocessedTrainingData);
-I = data{1,1};
+for i = 1:datasetR
+    data = read(preprocessedTrainingData);
+    target_box = data{2};
+    target_label = data{3};
+    
+    I = data{1,1};
+    
+    [bboxes, scores, labels] = detect(yolov3Detector,I);
+    
+    [Center, Labels] = getObjectCenter(yolov3Detector, I);
+    
+    I = insertMarker(I, Center, '*');
+    I = insertObjectAnnotation(I,'rectangle',target_box, target_label, 'Color', 'red');
+    I = insertObjectAnnotation(I,'rectangle',bboxes, labels);
 
-[bboxes, scores, labels] = detect(yolov3Detector,I, 'Threshold', 0.1);
+    fileName = ['dataset/result_v9_mask/' int2str(i) '.jpg'];
+    imwrite(I, fileName);
+end
 
-I = insertObjectAnnotation(I,'rectangle',bboxes, labels);
-figure
-imshow(I)
+results = detect(yolov3Detector,preprocessedTrainingData,'MiniBatchSize',8);
+
+[IoUs, Classes] = evaluateIoUandClass(results, preprocessedTrainingData);
+% Evaluate the object detector using Average Precision metric.
+[ap,recall,precision] = evaluateDetectionPrecision(results,preprocessedTrainingData);
